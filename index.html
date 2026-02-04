@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BHUVAN.LIVE - Neon Strike</title>
+    <style>
+        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; cursor: crosshair; }
+        
+        /* Branding Highlight */
+        #brand {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: 5px;
+            color: #00f2ff;
+            text-shadow: 0 0 10px #00f2ff, 0 0 20px #00f2ff;
+            animation: pulse 2s infinite;
+            z-index: 10;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.8; text-shadow: 0 0 10px #00f2ff; }
+            50% { opacity: 1; text-shadow: 0 0 25px #00f2ff, 0 0 40px #7000ff; }
+            100% { opacity: 0.8; text-shadow: 0 0 10px #00f2ff; }
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            background: rgba(0,0,0,0.5);
+            padding: 15px;
+            border-left: 4px solid #00f2ff;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+            background: rgba(0,0,0,0.9);
+            padding: 40px;
+            border: 2px solid #ff0055;
+            box-shadow: 0 0 50px #ff0055;
+        }
+
+        /* Scanline Effect overlay */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="brand">BHUVAN.LIVE</div>
+    <div class="overlay"></div>
+    
+    <div id="ui">
+        <div style="font-size: 12px; color: #888;">SYSTEM STATUS: ONLINE</div>
+        <div style="font-size: 24px; color: #0f0;">SCORE: <span id="score">0</span></div>
+    </div>
+
+    <div id="gameOver">
+        <h2 style="color: #ff0055; font-size: 40px; margin: 0;">TERMINATED</h2>
+        <p>Your streak on BHUVAN.LIVE has ended.</p>
+        <button onclick="location.reload()" style="padding: 12px 30px; background: transparent; border: 2px solid #0f0; color: #0f0; cursor: pointer; font-weight: bold;">INITIALIZE REBIRTH</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let score = 0;
+        let gameActive = true;
+        const player = { x: canvas.width/2, y: canvas.height/2, radius: 12, color: '#00f2ff', speed: 6 };
+        const keys = {};
+        const bullets = [], enemies = [], particles = [];
+
+        window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+        window.addEventListener('mousedown', (e) => {
+            if(!gameActive) return;
+            const angle = Math.atan2(e.clientY - player.y, e.clientX - player.x);
+            bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle) * 12, vy: Math.sin(angle) * 12 });
+        });
+
+        function createExplosion(x, y, color) {
+            for(let i=0; i<15; i++) {
+                particles.push({
+                    x, y, 
+                    vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10,
+                    alpha: 1, color: color, size: Math.random()*3
+                });
+            }
+        }
+
+        function spawnEnemy() {
+            if(!gameActive) return;
+            const radius = 15 + Math.random() * 15;
+            let x, y;
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? -radius : canvas.width + radius;
+                y = Math.random() * canvas.height;
+            } else {
+                x = Math.random() * canvas.width;
+                y = Math.random() < 0.5 ? -radius : canvas.height + radius;
+            }
+            enemies.push({ x, y, radius, speed: 1.2 + (score/500), color: '#ff0055' });
+            setTimeout(spawnEnemy, Math.max(200, 1000 - (score/10)));
+        }
+
+        function animate() {
+            if(!gameActive) return;
+            requestAnimationFrame(animate);
+            
+            // Motion Trail Effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Move Player
+            if(keys['w'] && player.y > 0) player.y -= player.speed;
+            if(keys['s'] && player.y < canvas.height) player.y += player.speed;
+            if(keys['a'] && player.x > 0) player.x -= player.speed;
+            if(keys['d'] && player.x < canvas.width) player.x += player.speed;
+
+            // Draw Player Glow
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = player.color;
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI*2);
+            ctx.fill();
+
+            // Bullets
+            bullets.forEach((b, i) => {
+                b.x += b.vx; b.y += b.vy;
+                ctx.fillStyle = '#fff';
+                ctx.shadowColor = '#fff';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 3, 0, Math.PI*2);
+                ctx.fill();
+                if(b.x<0 || b.x>canvas.width || b.y<0 || b.y>canvas.height) bullets.splice(i, 1);
+            });
+
+            // Enemies
+            enemies.forEach((en, ei) => {
+                const dist = Math.hypot(player.x - en.x, player.y - en.y);
+                const angle = Math.atan2(player.y - en.y, player.x - en.x);
+                en.x += Math.cos(angle) * en.speed;
+                en.y += Math.sin(angle) * en.speed;
+
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = en.color;
+                ctx.fillStyle = en.color;
+                ctx.beginPath();
+                ctx.arc(en.x, en.y, en.radius, 0, Math.PI*2);
+                ctx.fill();
+
+                if(dist < player.radius + en.radius) {
+                    gameActive = false;
+                    document.getElementById('gameOver').style.display = 'block';
+                }
+
+                bullets.forEach((b, bi) => {
+                    if(Math.hypot(b.x - en.x, b.y - en.y) < en.radius) {
+                        createExplosion(en.x, en.y, en.color);
+                        enemies.splice(ei, 1);
+                        bullets.splice(bi, 1);
+                        score += 10;
+                        document.getElementById('score').innerText = score;
+                    }
+                });
+            });
+
+            // Particles
+            particles.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy; p.alpha -= 0.02;
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                if(p.alpha <= 0) particles.splice(i, 1);
+            });
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
+        }
+
+        spawnEnemy();
+        animate();
+    </script>
+</body>
+</html>
